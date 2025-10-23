@@ -4,7 +4,7 @@ import { useReducer, useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { History, Sigma, Ruler, Delete, Undo2, Equal, Sparkles, Bot, Camera, RefreshCw } from 'lucide-react';
+import { History, Sigma, Ruler, Sparkles, Bot, Camera, RefreshCw, Trash2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -239,6 +239,15 @@ const PhotoMathPanel = ({ onExpressionChange, onTabChange }: { onExpressionChang
 
   useEffect(() => {
     const getCameraPermission = async () => {
+      if (typeof navigator.mediaDevices?.getUserMedia !== 'function') {
+         setHasCameraPermission(false);
+         toast({
+           variant: 'destructive',
+           title: 'Camera Not Supported',
+           description: 'Your browser does not support camera access.',
+         });
+         return;
+      }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         setHasCameraPermission(true);
@@ -282,7 +291,22 @@ const PhotoMathPanel = ({ onExpressionChange, onTabChange }: { onExpressionChang
       setExplanation(result);
       if (result.result !== 'Error' && result.result !== '0') {
         onExpressionChange(result.result);
-        onTabChange('assistant')
+      }
+       if (result.explanation) {
+        // This is a bit of a hack to pass the explanation to the other tab.
+        // A better solution would involve a shared state management (like Zustand or Redux).
+        setTimeout(() => {
+            const assistantButton = document.querySelector('button[data-state="inactive"][value="assistant"]') as HTMLButtonElement;
+            if (assistantButton) {
+                assistantButton.click();
+                 setTimeout(() => {
+                    const explainButton = document.evaluate("//button[contains(., 'Explain Calculation')]", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLButtonElement;
+                    if(explainButton) {
+                        explainButton.click();
+                    }
+                }, 100);
+            }
+        }, 0);
       }
     } catch (e) {
       toast({
@@ -305,7 +329,7 @@ const PhotoMathPanel = ({ onExpressionChange, onTabChange }: { onExpressionChang
     <div className="p-4 h-full flex flex-col space-y-4">
       <h3 className="font-semibold text-lg">Photo Math</h3>
       
-      <div className="relative aspect-video rounded-md overflow-hidden bg-zinc-800 flex items-center justify-center">
+      <div className="relative aspect-video rounded-md overflow-hidden bg-muted flex items-center justify-center">
         <video ref={videoRef} className={`w-full h-full object-cover ${capturedImage ? 'hidden' : ''}`} autoPlay playsInline muted />
         {capturedImage && (
             <img src={capturedImage} alt="Captured math problem" className="w-full h-full object-contain" />
@@ -394,7 +418,7 @@ export function CalculatorApp() {
     { label: '(', action: () => dispatch({ type: 'APPEND', payload: '(' }) },
     { label: ')', action: () => dispatch({ type: 'APPEND', payload: ')' }) },
     { label: 'Ans', action: () => dispatch({ type: 'APPEND', payload: lastAnswer }), className: 'text-primary' },
-    { label: <Delete className="text-primary" />, action: () => dispatch({ type: 'BACKSPACE' }) },
+    { label: <Trash2 className="text-primary" />, action: () => dispatch({ type: 'CLEAR' }) },
     { label: '7', action: () => dispatch({ type: 'APPEND', payload: '7' }) },
     { label: '8', action: () => dispatch({ type: 'APPEND', payload: '8' }) },
     { label: '9', action: () => dispatch({ type: 'APPEND', payload: '9' }) },
@@ -414,40 +438,40 @@ export function CalculatorApp() {
   ];
 
   return (
-    <Card className="w-full max-w-5xl shadow-2xl overflow-hidden bg-zinc-900 border-zinc-800 rounded-3xl">
+    <Card className="w-full max-w-5xl shadow-2xl overflow-hidden bg-card border-border rounded-3xl">
       <div className="flex flex-col md:flex-row">
         <div className="flex-1 p-4 md:p-6 flex flex-col">
           <div className="bg-transparent rounded-lg p-4 text-right h-32 mb-4 flex flex-col justify-end">
-            <p className="text-5xl md:text-6xl font-mono break-all font-light text-zinc-100" aria-live="polite">{expression || '0'}</p>
+            <p className="text-5xl md:text-6xl font-mono break-all font-light text-foreground" aria-live="polite">{expression || '0'}</p>
           </div>
           <div className="grid grid-cols-4 gap-2 flex-1">
             {buttons.map((btn, i) => (
               <Button
                 key={i}
-                variant={'ghost'}
-                className={`h-full text-2xl active:scale-95 transition-transform rounded-full aspect-square text-zinc-100 bg-zinc-700/50 hover:bg-zinc-700 ${btn.className}`}
+                variant={'secondary'}
+                className={`h-full text-2xl active:scale-95 transition-transform rounded-xl aspect-square text-foreground ${btn.className}`}
                 onClick={btn.action}
               >
                 {btn.label}
               </Button>
             ))}
              <Button
-                variant={'ghost'}
-                className="h-full text-xl active:scale-95 transition-transform rounded-full col-span-4 bg-zinc-700/50 hover:bg-zinc-700 text-primary"
-                onClick={() => dispatch({ type: 'CLEAR' })}
+                variant={'destructive'}
+                className="h-full text-xl active:scale-95 transition-transform rounded-xl col-span-4 bg-red-500/10 hover:bg-red-500/20 text-red-500"
+                onClick={() => dispatch({ type: 'BACKSPACE' })}
               >
-                Clear
+                Delete
               </Button>
           </div>
         </div>
-        <div className="w-full md:w-[28rem] border-t md:border-t-0 md:border-l bg-zinc-950/50 border-zinc-800">
+        <div className="w-full md:w-[28rem] border-t md:border-t-0 md:border-l bg-background border-border">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-5 rounded-none border-b bg-transparent p-0 border-zinc-800">
-                <TabsTrigger value="history" className="h-14 rounded-none data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 text-zinc-400"><History className="size-5" /></TabsTrigger>
-                <TabsTrigger value="functions" className="h-14 rounded-none data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 text-zinc-400"><Sigma className="size-5" /></TabsTrigger>
-                <TabsTrigger value="converter" className="h-14 rounded-none data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 text-zinc-400"><Ruler className="size-5" /></TabsTrigger>
-                <TabsTrigger value="assistant" className="h-14 rounded-none data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 text-zinc-400"><Sparkles className="size-5" /></TabsTrigger>
-                <TabsTrigger value="photo-math" className="h-14 rounded-none data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 text-zinc-400"><Camera className="size-5" /></TabsTrigger>
+            <TabsList className="grid w-full grid-cols-5 rounded-none border-b bg-transparent p-0 border-border">
+                <TabsTrigger value="history" className="h-14 rounded-none data-[state=active]:bg-accent data-[state=active]:text-foreground text-muted-foreground"><History className="size-5" /></TabsTrigger>
+                <TabsTrigger value="functions" className="h-14 rounded-none data-[state=active]:bg-accent data-[state=active]:text-foreground text-muted-foreground"><Sigma className="size-5" /></TabsTrigger>
+                <TabsTrigger value="converter" className="h-14 rounded-none data-[state=active]:bg-accent data-[state=active]:text-foreground text-muted-foreground"><Ruler className="size-5" /></TabsTrigger>
+                <TabsTrigger value="assistant" className="h-14 rounded-none data-[state=active]:bg-accent data-[state=active]:text-foreground text-muted-foreground"><Sparkles className="size-5" /></TabsTrigger>
+                <TabsTrigger value="photo-math" className="h-14 rounded-none data-[state=active]:bg-accent data-[state=active]:text-foreground text-muted-foreground"><Camera className="size-5" /></TabsTrigger>
             </TabsList>
             <TabsContent value="history" className="flex-1 mt-0">
                 <HistoryPanel history={history} onSelect={(val) => dispatch({ type: 'SET_EXPRESSION', payload: val})} onClear={() => setHistory([])} />
@@ -470,5 +494,3 @@ export function CalculatorApp() {
     </Card>
   );
 }
-
-    
