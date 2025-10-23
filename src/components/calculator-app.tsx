@@ -210,33 +210,43 @@ export function CalculatorApp() {
   ];
 
   return (
-    <Card className="w-full max-w-4xl shadow-2xl overflow-hidden">
+    <Card className="w-full max-w-4xl shadow-2xl overflow-hidden bg-background border-0">
       <div className="flex flex-col md:flex-row">
         <div className="flex-1 p-4 md:p-6 flex flex-col">
-          <div className="bg-muted/30 rounded-lg p-4 text-right h-28 mb-4 flex flex-col justify-end">
-            <p className="text-4xl md:text-5xl font-mono break-all" aria-live="polite">{expression || '0'}</p>
+          <div className="bg-transparent rounded-lg p-4 text-right h-28 mb-4 flex flex-col justify-end">
+            <p className="text-5xl md:text-6xl font-mono break-all font-light" aria-live="polite">{expression || '0'}</p>
           </div>
           <div className="grid grid-cols-4 gap-2 flex-1">
-            {buttons.map((btn, i) => (
-              <Button
-                key={i}
-                variant={typeof btn.label === 'string' && '0123456789.'.includes(btn.label) ? 'secondary' : 'default'}
-                className="h-full text-2xl active:scale-95 transition-transform"
-                onClick={btn.action}
-              >
-                {btn.label}
-              </Button>
-            ))}
+            {buttons.map((btn, i) => {
+              const isNumber = typeof btn.label === 'string' && '0123456789.'.includes(btn.label);
+              const isOperator = typeof btn.label === 'string' && '/*-+'.includes(btn.label);
+              const isEqual = typeof btn.label !== 'string'; // A bit of a hack for the Equal component
+
+              return (
+                <Button
+                  key={i}
+                  variant={isNumber ? 'secondary' : 'default'}
+                  className={`h-full text-2xl active:scale-95 transition-transform rounded-full aspect-square
+                    ${isEqual ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}
+                    ${isOperator ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}
+                    ${!isNumber && !isOperator && !isEqual ? 'bg-accent text-accent-foreground hover:bg-accent/80' : ''}
+                  `}
+                  onClick={btn.action}
+                >
+                  {btn.label}
+                </Button>
+              )
+            })}
              <Button
                 variant={'secondary'}
-                className="h-full text-2xl active:scale-95 transition-transform col-span-4"
+                className="h-full text-2xl active:scale-95 transition-transform rounded-full col-span-4"
                 onClick={() => dispatch({ type: 'CLEAR' })}
               >
                 Clear
               </Button>
           </div>
         </div>
-        <div className="w-full md:w-80 border-t md:border-t-0 md:border-l bg-card/50">
+        <div className="w-full md:w-80 border-t md:border-t-0 md:border-l bg-muted/20">
           <Tabs defaultValue="history" className="h-full flex flex-col">
             <TabsList className="grid w-full grid-cols-3 rounded-none border-b">
                 <TabsTrigger value="history" className="h-12 rounded-none"><History className="size-5" /></TabsTrigger>
