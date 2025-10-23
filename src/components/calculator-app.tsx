@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useState, useRef, useEffect } from 'react';
+import { useReducer, useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -114,10 +114,10 @@ const UnitConverter = () => {
     const [inputValue, setInputValue] = useState('1');
     const [outputValue, setOutputValue] = useState('');
 
-    const handleConvert = () => {
+    const handleConvert = useCallback(() => {
         const result = convertUnits(parseFloat(inputValue), fromUnit, toUnit, category);
         setOutputValue(result);
-    };
+    }, [inputValue, fromUnit, toUnit, category]);
 
     const handleCategoryChange = (newCategory: string) => {
         setCategory(newCategory);
@@ -128,10 +128,9 @@ const UnitConverter = () => {
         setOutputValue('');
     };
     
-    // biome-ignore lint/correctness/useExhaustiveDependencies: handleConvert should be triggered on state changes
     useEffect(() => {
         handleConvert();
-    }, [inputValue, fromUnit, toUnit, category]);
+    }, [inputValue, fromUnit, toUnit, category, handleConvert]);
 
   return (
     <div className="p-4 space-y-4">
@@ -229,7 +228,7 @@ const AssistantPanel = ({ expression }: { expression: string }) => {
   );
 };
 
-const PhotoMathPanel = ({ onExpressionChange }: { onExpressionChange: (expression: string) => void }) => {
+const PhotoMathPanel = ({ onExpressionChange, onTabChange }: { onExpressionChange: (expression: string) => void, onTabChange: (tab: string) => void }) => {
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -240,7 +239,6 @@ const PhotoMathPanel = ({ onExpressionChange }: { onExpressionChange: (expressio
 
   useEffect(() => {
     const getCameraPermission = async () => {
-      if (hasCameraPermission) return;
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         setHasCameraPermission(true);
@@ -260,7 +258,7 @@ const PhotoMathPanel = ({ onExpressionChange }: { onExpressionChange: (expressio
     };
 
     getCameraPermission();
-  }, [hasCameraPermission, toast]);
+  }, [toast]);
 
   const takePhoto = () => {
     if (videoRef.current && canvasRef.current) {
@@ -282,8 +280,9 @@ const PhotoMathPanel = ({ onExpressionChange }: { onExpressionChange: (expressio
     try {
       const result = await explainCalculation({ expression: '', photoDataUri: capturedImage });
       setExplanation(result);
-      if (result.result !== 'Error') {
+      if (result.result !== 'Error' && result.result !== '0') {
         onExpressionChange(result.result);
+        onTabChange('assistant')
       }
     } catch (e) {
       toast({
@@ -316,7 +315,7 @@ const PhotoMathPanel = ({ onExpressionChange }: { onExpressionChange: (expressio
             <Alert variant="destructive" className="m-4">
                 <AlertTitle>Camera Access Required</AlertTitle>
                 <AlertDescription>
-                Please allow camera access to use this feature.
+                Please allow camera access in your browser settings to use this feature.
                 </AlertDescription>
             </Alert>
         )}
@@ -335,20 +334,17 @@ const PhotoMathPanel = ({ onExpressionChange }: { onExpressionChange: (expressio
                     Retake
                 </Button>
                 <Button onClick={handleExplainPhoto} disabled={isLoading} className="w-full">
-                    {isLoading ? 'Thinking...' : <> <Sparkles className="mr-2 size-4" /> Explain</>}
+                    {isLoading ? 'Analyzing...' : <> <Sparkles className="mr-2 size-4" /> Explain & Solve</>}
                 </Button>
             </>
         )}
       </div>
 
       <ScrollArea className="flex-1">
-          {explanation && (
-            <Card className="p-4 bg-background">
-              <CardContent className="p-0 space-y-4">
-                 <p className="text-sm text-foreground whitespace-pre-wrap font-mono">{explanation.explanation}</p>
-                 <p className="text-lg font-bold text-primary">Result: {explanation.result}</p>
-              </CardContent>
-            </Card>
+          {explanation && !isLoading && (
+            <div className="text-sm text-muted-foreground p-4 text-center">
+              The explanation has been generated in the AI Assistant tab.
+            </div>
           )}
            {isLoading && (
             <div className="flex items-center justify-center pt-10">
@@ -357,7 +353,9 @@ const PhotoMathPanel = ({ onExpressionChange }: { onExpressionChange: (expressio
            )}
            {!isLoading && !explanation && (
              <p className="text-muted-foreground text-center pt-4">
-               {hasCameraPermission ? 'Point your camera at a math problem and take a photo.' : 'Enable camera to get started.'}
+               {hasCameraPermission === null && 'Requesting camera permission...'}
+               {hasCameraPermission === true && 'Point your camera at a math problem and take a photo.'}
+               {hasCameraPermission === false && 'Enable camera access to get started.'}
             </p>
            )}
       </ScrollArea>
@@ -370,6 +368,7 @@ export function CalculatorApp() {
   const [{ expression }, dispatch] = useReducer(reducer, initialState);
   const [history, setHistory] = useState<{ expression: string; result: string }[]>([]);
   const [lastAnswer, setLastAnswer] = useState('');
+  const [activeTab, setActiveTab] = useState('history');
   const { toast } = useToast();
 
   const handleCalculate = () => {
@@ -442,7 +441,7 @@ export function CalculatorApp() {
           </div>
         </div>
         <div className="w-full md:w-[28rem] border-t md:border-t-0 md:border-l bg-zinc-950/50 border-zinc-800">
-          <Tabs defaultValue="history" className="h-full flex flex-col">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
             <TabsList className="grid w-full grid-cols-5 rounded-none border-b bg-transparent p-0 border-zinc-800">
                 <TabsTrigger value="history" className="h-14 rounded-none data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 text-zinc-400"><History className="size-5" /></TabsTrigger>
                 <TabsTrigger value="functions" className="h-14 rounded-none data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 text-zinc-400"><Sigma className="size-5" /></TabsTrigger>
@@ -463,7 +462,7 @@ export function CalculatorApp() {
                 <AssistantPanel expression={expression} />
             </TabsContent>
             <TabsContent value="photo-math" className="flex-1 mt-0">
-                <PhotoMathPanel onExpressionChange={handleSetExpression} />
+                <PhotoMathPanel onExpressionChange={handleSetExpression} onTabChange={setActiveTab} />
             </TabsContent>
           </Tabs>
         </div>
@@ -471,3 +470,5 @@ export function CalculatorApp() {
     </Card>
   );
 }
+
+    
