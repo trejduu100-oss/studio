@@ -4,13 +4,15 @@ import { useReducer, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { History, Sigma, Ruler, Delete, Undo2, Equal, Pipette } from 'lucide-react';
+import { History, Sigma, Ruler, Delete, Undo2, Equal, Sparkles, Bot } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { unitCategories, convertUnits } from '@/lib/conversions';
 import { functions } from '@/lib/functions';
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/use-toast";
+import { explainCalculation } from '@/ai/flows/calculator-assistant-flow';
+import type { ExplainCalculationOutput } from '@/ai/flows/calculator-assistant-types';
 
 type State = {
   expression: string;
@@ -164,6 +166,68 @@ const UnitConverter = () => {
   );
 };
 
+const AssistantPanel = ({ expression }: { expression: string }) => {
+  const [explanation, setExplanation] = useState<ExplainCalculationOutput | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+
+  const handleExplain = async () => {
+    if (!expression || expression === 'Error' || expression === '0') {
+      toast({
+        title: "No expression",
+        description: "Enter a calculation to get an explanation.",
+        variant: "destructive"
+      });
+      return;
+    }
+    setIsLoading(true);
+    setExplanation(null);
+    try {
+      const result = await explainCalculation({ expression });
+      setExplanation(result);
+    } catch (e) {
+      toast({
+        title: "AI Assistant Error",
+        description: "Could not get an explanation.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="p-4 h-full flex flex-col">
+      <h3 className="font-semibold text-lg mb-4">AI Assistant</h3>
+      <div className="flex-1 space-y-4">
+        <Button onClick={handleExplain} disabled={isLoading} className="w-full">
+          {isLoading ? 'Thinking...' : <> <Sparkles className="mr-2 size-4" /> Explain Calculation</>}
+        </Button>
+        <ScrollArea className="h-96">
+          {explanation && (
+            <Card className="p-4 bg-background">
+              <CardContent className="p-0 space-y-4">
+                 <p className="text-sm text-foreground whitespace-pre-wrap font-mono">{explanation.explanation}</p>
+                 <p className="text-lg font-bold text-primary">Result: {explanation.result}</p>
+              </CardContent>
+            </Card>
+          )}
+           {isLoading && (
+            <div className="flex items-center justify-center pt-10">
+              <Bot className="size-8 animate-bounce" />
+            </div>
+           )}
+           {!isLoading && !explanation && (
+             <p className="text-muted-foreground text-center pt-10">
+               Enter a calculation and click "Explain Calculation" to see a step-by-step breakdown.
+            </p>
+           )}
+        </ScrollArea>
+      </div>
+    </div>
+  );
+};
+
 
 export function CalculatorApp() {
   const [{ expression }, dispatch] = useReducer(reducer, initialState);
@@ -189,78 +253,72 @@ export function CalculatorApp() {
   const buttons = [
     { label: '(', action: () => dispatch({ type: 'APPEND', payload: '(' }) },
     { label: ')', action: () => dispatch({ type: 'APPEND', payload: ')' }) },
-    { label: <Undo2 />, action: () => dispatch({ type: 'APPEND', payload: lastAnswer }) },
-    { label: <Delete />, action: () => dispatch({ type: 'BACKSPACE' }) },
+    { label: 'Ans', action: () => dispatch({ type: 'APPEND', payload: lastAnswer }), className: 'text-primary' },
+    { label: <Delete className="text-primary" />, action: () => dispatch({ type: 'BACKSPACE' }) },
     { label: '7', action: () => dispatch({ type: 'APPEND', payload: '7' }) },
     { label: '8', action: () => dispatch({ type: 'APPEND', payload: '8' }) },
     { label: '9', action: () => dispatch({ type: 'APPEND', payload: '9' }) },
-    { label: '/', action: () => dispatch({ type: 'APPEND', payload: '/' }) },
+    { label: '÷', action: () => dispatch({ type: 'APPEND', payload: '/' }), className: 'bg-primary text-primary-foreground' },
     { label: '4', action: () => dispatch({ type: 'APPEND', payload: '4' }) },
     { label: '5', action: () => dispatch({ type: 'APPEND', payload: '5' }) },
     { label: '6', action: () => dispatch({ type: 'APPEND', payload: '6' }) },
-    { label: '*', action: () => dispatch({ type: 'APPEND', payload: '*' }) },
+    { label: '×', action: () => dispatch({ type: 'APPEND', payload: '*' }), className: 'bg-primary text-primary-foreground' },
     { label: '1', action: () => dispatch({ type: 'APPEND', payload: '1' }) },
     { label: '2', action: () => dispatch({ type: 'APPEND', payload: '2' }) },
     { label: '3', action: () => dispatch({ type: 'APPEND', payload: '3' }) },
-    { label: '-', action: () => dispatch({ type: 'APPEND', payload: '-' }) },
+    { label: '−', action: () => dispatch({ type: 'APPEND', payload: '-' }), className: 'bg-primary text-primary-foreground' },
     { label: '0', action: () => dispatch({ type: 'APPEND', payload: '0' }) },
     { label: '.', action: () => dispatch({ type: 'APPEND', payload: '.' }) },
-    { label: <Equal />, action: handleCalculate },
-    { label: '+', action: () => dispatch({ type: 'APPEND', payload: '+' }) },
+    { label: '=', action: handleCalculate, className: 'bg-primary text-primary-foreground' },
+    { label: '+', action: () => dispatch({ type: 'APPEND', payload: '+' }), className: 'bg-primary text-primary-foreground' },
   ];
 
   return (
-    <Card className="w-full max-w-4xl shadow-2xl overflow-hidden bg-background border-0">
+    <Card className="w-full max-w-4xl shadow-2xl overflow-hidden bg-zinc-900 border-zinc-800 rounded-3xl">
       <div className="flex flex-col md:flex-row">
         <div className="flex-1 p-4 md:p-6 flex flex-col">
-          <div className="bg-transparent rounded-lg p-4 text-right h-28 mb-4 flex flex-col justify-end">
-            <p className="text-5xl md:text-6xl font-mono break-all font-light" aria-live="polite">{expression || '0'}</p>
+          <div className="bg-transparent rounded-lg p-4 text-right h-32 mb-4 flex flex-col justify-end">
+            <p className="text-5xl md:text-6xl font-mono break-all font-light text-zinc-100" aria-live="polite">{expression || '0'}</p>
           </div>
           <div className="grid grid-cols-4 gap-2 flex-1">
-            {buttons.map((btn, i) => {
-              const isNumber = typeof btn.label === 'string' && '0123456789.'.includes(btn.label);
-              const isOperator = typeof btn.label === 'string' && '/*-+'.includes(btn.label);
-              const isEqual = typeof btn.label !== 'string'; // A bit of a hack for the Equal component
-
-              return (
-                <Button
-                  key={i}
-                  variant={isNumber ? 'secondary' : 'default'}
-                  className={`h-full text-2xl active:scale-95 transition-transform rounded-full aspect-square
-                    ${isEqual ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}
-                    ${isOperator ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}
-                    ${!isNumber && !isOperator && !isEqual ? 'bg-accent text-accent-foreground hover:bg-accent/80' : ''}
-                  `}
-                  onClick={btn.action}
-                >
-                  {btn.label}
-                </Button>
-              )
-            })}
+            {buttons.map((btn, i) => (
+              <Button
+                key={i}
+                variant={'ghost'}
+                className={`h-full text-2xl active:scale-95 transition-transform rounded-full aspect-square text-zinc-100 bg-zinc-700/50 hover:bg-zinc-700 ${btn.className}`}
+                onClick={btn.action}
+              >
+                {btn.label}
+              </Button>
+            ))}
              <Button
-                variant={'secondary'}
-                className="h-full text-2xl active:scale-95 transition-transform rounded-full col-span-4"
+                variant={'ghost'}
+                className="h-full text-xl active:scale-95 transition-transform rounded-full col-span-4 bg-zinc-700/50 hover:bg-zinc-700 text-primary"
                 onClick={() => dispatch({ type: 'CLEAR' })}
               >
                 Clear
               </Button>
           </div>
         </div>
-        <div className="w-full md:w-80 border-t md:border-t-0 md:border-l bg-muted/20">
+        <div className="w-full md:w-96 border-t md:border-t-0 md:border-l bg-zinc-950/50 border-zinc-800">
           <Tabs defaultValue="history" className="h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-3 rounded-none border-b">
-                <TabsTrigger value="history" className="h-12 rounded-none"><History className="size-5" /></TabsTrigger>
-                <TabsTrigger value="functions" className="h-12 rounded-none"><Sigma className="size-5" /></TabsTrigger>
-                <TabsTrigger value="converter" className="h-12 rounded-none"><Ruler className="size-5" /></TabsTrigger>
+            <TabsList className="grid w-full grid-cols-4 rounded-none border-b bg-transparent p-0 border-zinc-800">
+                <TabsTrigger value="history" className="h-14 rounded-none data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 text-zinc-400"><History className="size-5" /></TabsTrigger>
+                <TabsTrigger value="functions" className="h-14 rounded-none data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 text-zinc-400"><Sigma className="size-5" /></TabsTrigger>
+                <TabsTrigger value="converter" className="h-14 rounded-none data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 text-zinc-400"><Ruler className="size-5" /></TabsTrigger>
+                <TabsTrigger value="assistant" className="h-14 rounded-none data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 text-zinc-400"><Sparkles className="size-5" /></TabsTrigger>
             </TabsList>
-            <TabsContent value="history" className="flex-1">
+            <TabsContent value="history" className="flex-1 mt-0">
                 <HistoryPanel history={history} onSelect={(val) => dispatch({ type: 'SET_EXPRESSION', payload: val})} onClear={() => setHistory([])} />
             </TabsContent>
-            <TabsContent value="functions" className="flex-1">
+            <TabsContent value="functions" className="flex-1 mt-0">
                 <FunctionsPanel onSelect={(val) => dispatch({ type: 'APPEND', payload: val })} />
             </TabsContent>
-            <TabsContent value="converter" className="flex-1">
+            <TabsContent value="converter" className="flex-1 mt-0">
                 <UnitConverter />
+            </TabsContent>
+            <TabsContent value="assistant" className="flex-1 mt-0">
+                <AssistantPanel expression={expression} />
             </TabsContent>
           </Tabs>
         </div>
