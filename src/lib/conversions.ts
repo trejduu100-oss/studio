@@ -79,6 +79,10 @@ export function convertUnits(value: number, fromUnit: string, toUnit: string, ca
   const fromFactor = categoryUnits[fromUnit as keyof typeof categoryUnits] as number;
   const toFactor = categoryUnits[toUnit as keyof typeof categoryUnits] as number;
   
+  if (fromFactor === undefined || toFactor === undefined) {
+    return ''
+  }
+
   const result = value * fromFactor / toFactor;
 
   return parseFloat(result.toPrecision(10)).toString();

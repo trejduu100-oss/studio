@@ -19,14 +19,24 @@ const prompt = ai.definePrompt({
   output: { schema: ExplainCalculationOutputSchema },
   prompt: `You are a helpful calculator assistant. 
   
-  Explain the following mathematical expression in a clear and concise way. 
+  Your task is to analyze the provided information, which can be a mathematical expression, a photo of a math problem, or both.
   
+  If a photo is provided, analyze the image to identify the mathematical expression.
+  If a text expression is also provided, it should be considered secondary to the photo.
+  
+  Explain the identified mathematical expression in a clear and concise way.
   Provide the final answer as well.
   
   Expression: \`{{{expression}}}\`
-  
+  {{#if photoDataUri}}
+  Photo:
+  {{media url=photoDataUri}}
+  {{/if}}
+
   Your explanation should be understandable to someone who is not a math expert.
   Break down the calculation into simple steps.
+  
+  If you cannot determine the expression from the inputs, set the result to "Error" and provide an explanation of why.
   `,
 });
 
